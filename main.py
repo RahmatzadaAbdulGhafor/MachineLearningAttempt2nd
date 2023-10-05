@@ -9,6 +9,13 @@ import pickle
 # from tensorflow.keras.models import Sequential
 from keras import Sequential
 from keras.src.layers import Conv2D, Activation, MaxPooling2D, Flatten, Dense
+from tensorflow.keras.models import load_model
+
+class StopAtAccuracy(tf.keras.callbacks.Callback):
+    def on_epoch_end(self, epoch, logs={}):
+        if logs.get('accuracy') >= 1.0:
+            print("\nReached 100% accuracy, stopping training!")
+            self.model.stop_training = True
 
 
 def create_test_data(X_test, y_test):
@@ -104,8 +111,55 @@ def create_val_data(X_val, y_val):
     pickle.dump(y_val, pickle_out)
     pickle_out.close()
 
+def makeModel():
+   #create model
+    model = Sequential()
+    model.add(Conv2D(64, (3, 3), input_shape=X_train.shape[1:]))
+    model.add(Activation("relu"))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+
+    model.add(Conv2D(64, (3, 3)))
+    model.add(Activation("relu"))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+
+    model.add(Conv2D(64, (3, 3)))
+    model.add(Activation("relu"))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+
+    model.add(Conv2D(64, (3, 3)))
+    model.add(Activation("relu"))
+    model.add(MaxPooling2D(pool_size=(2, 2)))
+
+    model.add(Flatten())
+    model.add(Dense(512, activation='relu'))
+
+    model.add(Dense(1))
+    model.add(Activation('sigmoid'))
+
+    model.compile(loss="binary_crossentropy", optimizer="adam", metrics=['accuracy'])
+
+    model.fit(X_train, y_train, batch_size=15, epochs=25, verbose=1, validation_data=(X_val, y_val), callbacks=[early_stop, stop_at_1_accuracy])
+    model.save("NeuralNetwork.keras")
+
+def displayTestImages(X_test, y_test, y_pred, numImages):
+    plt.figure(figsize=(15, 5))
+
+    for i in range(numImages):
+        idx = random.randint(0, len(X_test) - 1)
+        plt.subplot(1, numImages, i + 1)
+
+        plt.imshow(X_test[idx])
+        plt.title(
+            f"Actual: {'Pneumonia' if y_test[idx] == 1 else 'Normal'}\nPredicted: {'Pneumonia' if y_pred[idx] == 1 else 'Normal'}")
+        plt.axis('off')
+
+    plt.tight_layout()
+    plt.show()
+
 
 if __name__ == "__main__":
+    stop_at_1_accuracy = StopAtAccuracy()
+    early_stop = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
     import os
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -133,18 +187,18 @@ if __name__ == "__main__":
 
     #create_training_data(X_train,y_train)
 
-   #create_test_data(X_test,y_test)
+    #create_test_data(X_test,y_test)
 
     #create_val_data(X_val, y_val)
 
-
-    pickle_in = open("X.pickle", "rb")
-    X_train = pickle.load(pickle_in)
-    X_train = np.array(X_train)
-
-    pickle_in = open("y.pickle", "rb")
-    y_train = pickle.load(pickle_in)
-    y_train = np.array(y_train)
+    #
+    # pickle_in = open("X.pickle", "rb")
+    # X_train = pickle.load(pickle_in)
+    # X_train = np.array(X_train)
+    #
+    # pickle_in = open("y.pickle", "rb")
+    # y_train = pickle.load(pickle_in)
+    # y_train = np.array(y_train)
 
     pickle_inx = open("X_test.pickle", "rb")
     X_test = pickle.load(pickle_inx)
@@ -153,68 +207,40 @@ if __name__ == "__main__":
     pickle_iny = open("y_test.pickle", "rb")
     y_test = pickle.load(pickle_iny)
     y_test = np.array(y_test)
-
-    pickle_inval = open("X_val.pickle", "rb")
-    X_val = pickle.load(pickle_inval)
-    X_val = np.array(X_val)
-
-    pickle_inyval = open("y_val.pickle", "rb")
-    y_val = pickle.load(pickle_inyval)
-    y_val = np.array(y_val)
+    #
+    # pickle_inval = open("X_val.pickle", "rb")
+    # X_val = pickle.load(pickle_inval)
+    # X_val = np.array(X_val)
+    #
+    # pickle_inyval = open("y_val.pickle", "rb")
+    # y_val = pickle.load(pickle_inyval)
+    # y_val = np.array(y_val)
 
     # Normalize the test images
     X_test = X_test / 255.0
 
     # normalise data and train
-    X_train = X_train / 255.0
+    # X_train = X_train / 255.0
 
-    X_val = X_val / 255.0
+    # X_val = X_val / 255.0
 
-    #create model
-    model = Sequential()
-    model.add(Conv2D(64, (3, 3), input_shape=X_train.shape[1:]))
-    model.add(Activation("relu"))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-
-    model.add(Conv2D(64, (3, 3)))
-    model.add(Activation("relu"))
-    model.add(MaxPooling2D(pool_size=(2, 2)))
-
-    model.add(Flatten())
-    model.add(Dense(64))
-
-    model.add(Dense(1))
-    model.add(Activation('sigmoid'))
-
-    model.compile(loss="binary_crossentropy", optimizer="adam", metrics=['accuracy'])
-
-    model.fit(X_train, y_train, batch_size=20, epochs=5, verbose=1, validation_data=(X_val, y_val))
-
-    # change array sizes to match
+    #makeModel()
 
 
-    model.evaluate(X_test, y_test)
 
-    # Predict on the test set
+    model = load_model("NeuralNetwork.keras")
+    model.summary()
+
     y_pred_probs = model.predict((X_test))
     y_pred = [1 if prob > 0.5 else 0 for prob in y_pred_probs]
 
-    idx =random.randint (0,len(y_test))
-    plt.imshow(X_test[idx, :])
-    plt.show()
 
-    y_pred2 = model.predict(X_test[idx, :].reshape(-1, IMG_SIZE, IMG_SIZE, 1))
-    y_pred2 = y_pred2 > 0.5
 
-    if(y_pred2):
-        pred2 = 'normal'
-    else:
-        pred2 = 'pneumonia'
 
-    print("OUR model thinks it is: "+ pred2)
+    # print("EVALUATION")
+    model.evaluate(X_test, y_test)
 
-    if (y_test[idx]==0):
-        pred2 = 'normal'
-    else:
-        pred2 = 'pneumonia'
-    print("The ACTUAL result is " + pred2)
+    # Predict on the test set
+    displayTestImages(X_test, y_test, y_pred, 5)
+
+
